@@ -11,14 +11,14 @@
   },
   "dependencies": {
     "nodemailer": "^6.9.1",
-    "next": "13.3.0", // or the latest version
-    "react": "18.2.0", // or the latest version
-    "react-dom": "18.2.0" // or the latest version
+    "next": "13.3.0", 
+    "react": "18.2.0", 
+    "react-dom": "18.2.0" 
   },
   "devDependencies": {
     "eslint": "^8.43.0",
-    "eslint-config-next": "13.3.0" // or the latest version
+    "eslint-config-next": "13.3.0" 
   },
-  "author": "Your Name",
+  "author": "Hurt ice",
   "license": "MIT"
 }
