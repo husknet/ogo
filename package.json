@@ -1,0 +1,24 @@
+{
+  "name": "my-proxy-app",
+  "version": "1.0.0",
+  "description": "A Next.js app with a proxy API that handles email sending and redirects.",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "nodemailer": "^6.9.1",
+    "next": "13.3.0", // or the latest version
+    "react": "18.2.0", // or the latest version
+    "react-dom": "18.2.0" // or the latest version
+  },
+  "devDependencies": {
+    "eslint": "^8.43.0",
+    "eslint-config-next": "13.3.0" // or the latest version
+  },
+  "author": "Your Name",
+  "license": "MIT"
+}

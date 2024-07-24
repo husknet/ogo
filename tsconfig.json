@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "es5",                       // Specify ECMAScript target version (ES5 or ES6/ES2015)
+    "lib": ["dom", "dom.iterable", "esnext"], // Specify library files to include in the compilation
+    "allowJs": true,                      // Allow JavaScript files to be compiled
+    "skipLibCheck": true,                 // Skip type checking of all declaration files (*.d.ts)
+    "strict": true,                       // Enable all strict type-checking options
+    "forceConsistentCasingInFileNames": true, // Ensure that casing of file names is consistent
+    "noEmit": true,                       // Do not emit output (used with `next` for type checking)
+    "esModuleInterop": true,              // Enables emit interoperability between CommonJS and ES Modules
+    "module": "esnext",                   // Specify module code generation (CommonJS, AMD, ES6, etc.)
+    "moduleResolution": "node",           // Determine how modules get resolved
+    "resolveJsonModule": true,            // Allow importing .json files
+    "isolatedModules": true,              // Ensure that each file can be safely transpiled without relying on other files
+    "jsx": "preserve"                     // Keep JSX as-is (needed for Next.js)
+  },
+  "include": [
+    "src/**/*"                            // Include all files in the src directory
+  ],
+  "exclude": [
+    "node_modules"                        // Exclude the node_modules directory
+  ]
+}

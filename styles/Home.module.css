@@ -1,0 +1,39 @@
+.container {
+  min-height: 100vh;
+  padding: 0 0.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.main {
+  text-align: center;
+}
+
+.title {
+  font-size: 2rem;
+  line-height: 1.15;
+  color: #0070f3;
+  margin: 0;
+}
+
+.content {
+  font-size: 1rem;
+  color: #333;
+  padding: 1rem;
+  max-width: 800px;
+  margin: auto;
+}
+
+.footer {
+  display: flex;
+  justify-content: center;
+  padding: 1rem;
+  border-top: 1px solid #eaeaea;
+}
+
+.footer a {
+  display: flex;
+  align-items: center;
+}
