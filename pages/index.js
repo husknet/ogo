@@ -1,56 +1,43 @@
 import { useEffect, useState } from 'react';
-import Head from 'next/head';
-import styles from '../styles/Home.module.css';
 
 export default function Home() {
-  const [content, setContent] = useState('');
+    const [content, setContent] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-  useEffect(() => {
-    // Fetch the proxied content from the API route
-    async function fetchProxiedContent() {
-      try {
-        const response = await fetch('/api/proxy');
-        const data = await response.text();
-        setContent(data);
-      } catch (error) {
-        console.error('Error fetching proxied content:', error);
-        setContent('Failed to load content.');
-      }
+    useEffect(() => {
+        const fetchContent = async () => {
+            try {
+                const response = await fetch('/api/proxy');
+                
+                if (response.ok) {
+                    const text = await response.text();
+                    setContent(text);
+                } else {
+                    setError(`Error fetching content: ${response.statusText}`);
+                }
+            } catch (err) {
+                setError(`Error fetching content: ${err.message}`);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchContent();
+    }, []);
+
+    if (loading) {
+        return <div>Loading...</div>;
     }
 
-    fetchProxiedContent();
-  }, []);
+    if (error) {
+        return <div>Error: {error}</div>;
+    }
 
-  return (
-    <div className={styles.container}>
-      <Head>
-        <title>Proxied Content</title>
-        <meta name="description" content="Displaying content from an upstream URL through a proxy." />
-        <link rel="icon" href="/favicon.ico" />
-      </Head>
-
-      <main className={styles.main}>
-        <h1 className={styles.title}>
-          Proxied Content from Upstream
-        </h1>
-
-        <div className={styles.content}>
-          <p>{content}</p>
+    return (
+        <div>
+            <h1>Content from Proxy</h1>
+            <div dangerouslySetInnerHTML={{ __html: content }} />
         </div>
-      </main>
-
-      <footer className={styles.footer}>
-        <a
-          href="https://vercel.com"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Powered by{' '}
-          <span className={styles.logo}>
-            <img src="/vercel.svg" alt="Vercel Logo" />
-          </span>
-        </a>
-      </footer>
-    </div>
-  );
+    );
 }
